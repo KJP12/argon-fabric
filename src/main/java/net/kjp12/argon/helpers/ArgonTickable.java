@@ -2,7 +2,7 @@ package net.kjp12.argon.helpers;
 
 import net.kjp12.argon.TickingState;
 
-public interface IArgonTickable {
+public interface ArgonTickable {
     /**
      * This is the same as tick in normal tickables.
      * <p>

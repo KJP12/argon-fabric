@@ -13,7 +13,7 @@ public enum TickingState {
      * This entity is inactive. It's ticked every 300 ticks, or 15 seconds.
      * Time dilation will be applied.
      * AI mustn't be ticked 300 times in inactive state.
-     * However, the AI's random can be adjusted for the delay.
+     * However, the AI's randomness can be adjusted for the delay.
      * <em>Attacking AI must not be ticked more than once.</em>
      * <em>If the AI is attacking, bump the priority to {@link #CRITICAL}.</em>
      * <em>If the AI is mutating blocks, bump the priority to {@link #ACTIVE}.</em>
@@ -26,7 +26,7 @@ public enum TickingState {
      * This entity is inactive. It's ticked every 20 ticks, or 1 second.
      * Time dilation will be applied.
      * AI mustn't be ticked 20 times in inactive state.
-     * However, the AI's random can be adjusted for the delay.
+     * However, the AI can be adjusted for the delay.
      * <em>Attacking AI must not be ticked more than once.</em>
      * <em>If the AI is attacking, bump the priority to {@link #CRITICAL}.</em>
      * <em>If the AI is mutating blocks, bump the priority to {@link #ACTIVE}.<em/>
@@ -35,6 +35,11 @@ public enum TickingState {
      * For: Still mobs.
      */
     INACTIVE(0),
+    /**
+     * This entity is active, but at a slower tickrate. It is ticked at around the same speed as hoppers.
+     * This is primarily intended for hoppers and anything else that may interface with hoppers.
+     */
+    HOPPER(0),
     /**
      * This entity is active. It's ticked every tick, or 1/20th of a second.
      * Time dilation will only be applied if the server lags behind.

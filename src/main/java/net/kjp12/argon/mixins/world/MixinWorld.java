@@ -1,4 +1,4 @@
-package net.kjp12.argon.mixins;
+package net.kjp12.argon.mixins.world;
 
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
