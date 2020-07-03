@@ -36,7 +36,9 @@ public enum TickingState {
      */
     INACTIVE(0),
     /**
-     * This entity is active, but at a slower tickrate. It is ticked at around the same speed as hoppers.
+     * This entity is active. It's ticked every 8 ticks, or 2/5th of a second.
+     * Time dilation will be applied.
+     * AI mustn't be ticked 8 times in inactive state.
      * This is primarily intended for hoppers and anything else that may interface with hoppers.
      */
     HOPPER(0),

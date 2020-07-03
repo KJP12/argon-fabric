@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "argon",
+  "version": "${version}",
+  "name": "Argon",
+  "description": "Argon Multithreading",
+  "authors": [
+    "KJP12"
+  ],
+  "contact": {
+    "sources": "https://github.com/KJP12/argon-fabric"
+  },
+  "environment": "*",
+  "entrypoints": {
+    "main": []
+  },
+  "mixins": [
+    "argon.mixins.json"
+  ],
+  "depends": {
+    "minecraft": ">=${minecraft_required}",
+    "fabricloader": ">=${loader_version}"
+  }
+}

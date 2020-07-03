@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "package": "net.kjp12.argon.mixins",
+  "compatibilityLevel": "JAVA_11",
+  "mixins": [
+    "AccessorServer",
+    "MixinNetworkThreadUtils",
+    "MixinPlayerManager",
+    "MixinServer",
+    "MixinServerPlayNetworkHandler",
+    "MixinTickable",
+    "world.MixinWorld"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
