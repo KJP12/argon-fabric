@@ -7,6 +7,7 @@ import net.kjp12.argon.utils.Ticker;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.entity.Entity;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.profiler.Profiler;
 import net.minecraft.util.registry.RegistryKey;
@@ -37,6 +38,9 @@ public abstract class MixinWorld extends World implements ServerWorldAccess, Sub
     @Final
     private MinecraftServer server;
 
+    @Shadow
+    public abstract void removePlayer(ServerPlayerEntity player);
+
     protected MixinWorld(MutableWorldProperties mutableWorldProperties, RegistryKey<World> registryKey, RegistryKey<DimensionType> registryKey2, DimensionType dimensionType, Supplier<Profiler> profiler, boolean bl, boolean bl2, long l) {
         super(mutableWorldProperties, registryKey, registryKey2, dimensionType, profiler, bl, bl2, l);
     }
@@ -49,6 +53,14 @@ public abstract class MixinWorld extends World implements ServerWorldAccess, Sub
 
     @Inject(method = "<init>", at = @At("TAIL"))
     public void argon$init(CallbackInfo cbi) {
+    }
+
+    @Inject(method = "removePlayer", at = @At("HEAD"), cancellable = true)
+    private void argon$removePlayer(ServerPlayerEntity player, CallbackInfo cbi) {
+        if (Thread.currentThread() != subServer.getThread()) {
+            subServer.execute(() -> removePlayer(player));
+            cbi.cancel();
+        }
     }
 
     @Override

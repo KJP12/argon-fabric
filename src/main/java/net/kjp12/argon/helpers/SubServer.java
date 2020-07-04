@@ -1,15 +1,22 @@
 package net.kjp12.argon.helpers;
 
 import net.kjp12.argon.concurrent.ArgonTask;
+import net.minecraft.network.ClientConnection;
+import net.minecraft.network.packet.s2c.play.DisconnectS2CPacket;
 import net.minecraft.network.packet.s2c.play.WorldTimeUpdateS2CPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.ServerTask;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.LiteralText;
+import net.minecraft.text.Text;
+import net.minecraft.util.MetricsData;
+import net.minecraft.util.TickDurationMonitor;
 import net.minecraft.util.Util;
 import net.minecraft.util.crash.CrashException;
 import net.minecraft.util.crash.CrashReport;
 import net.minecraft.util.profiler.DummyProfiler;
 import net.minecraft.util.profiler.Profiler;
+import net.minecraft.util.profiler.TickTimeTracker;
 import net.minecraft.util.registry.RegistryKey;
 import net.minecraft.util.thread.ReentrantThreadExecutor;
 import net.minecraft.world.GameRules;
@@ -17,7 +24,11 @@ import net.minecraft.world.World;
 
 import java.nio.file.Path;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.function.BooleanSupplier;
 
@@ -26,21 +37,24 @@ import static net.kjp12.argon.Argon.logger;
 public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Runnable {
     private final MinecraftServer server;
     private final Thread thread;
+    public MetricsData metricsData = new MetricsData();
+    private Queue<ClientConnection> awaitingConnections = new ConcurrentLinkedQueue<>();
+    private List<ClientConnection> activeConnections = new ArrayList<>();
+    private TickTimeTracker tickTimeTracker = new TickTimeTracker(Util.nanoTimeSupplier, this::getTicks);
     public Profiler profiler = DummyProfiler.INSTANCE;
     public ArgonTask<ServerWorld> awaitWorld;
     private ServerWorld world;
     private int ticks;
     private long timeReference, lastTimeReference, maxTimeReference;
+    private String worldName;
     private boolean waitingForNextTick;
 
-    public SubServer(
-            MinecraftServer server,
-            RegistryKey<World> worldKey,
-            ArgonTask<ServerWorld> worldTask) {
+    public SubServer(MinecraftServer server, RegistryKey<World> worldKey, ArgonTask<ServerWorld> worldTask) {
         super(worldKey.getValue().toString());
         this.server = server;
         awaitWorld = worldTask;
-        thread = new Thread(this, "[Argon] " + worldKey.getValue().toString() + "-world-thread");
+        worldName = worldKey.getValue().toString();
+        thread = new Thread(this, "[Argon] " + worldName);
         thread.setUncaughtExceptionHandler((t, e) -> logger.error("Error handling {}:", t, e));
         thread.start();
     }
@@ -60,7 +74,7 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
     }
 
     @Override
-    protected Thread getThread() {
+    public Thread getThread() {
         return thread;
     }
 
@@ -74,7 +88,7 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
             server.populateCrashReport(report);
             throw new CrashException(report);
         }
-        try {
+        try /*(var w = world)*/ {
             timeReference = Util.getMeasuringTimeMs();
             while (server.isRunning()) {
                 long l = Util.getMeasuringTimeMs() - timeReference;
@@ -85,8 +99,8 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
                     lastTimeReference = timeReference;
                 }
                 timeReference += 50L;
-                // var durationMonitor = TickDurationMonitor.create(thread.getName());
-                // startMonitor(durationMonitor);
+                var durationMonitor = TickDurationMonitor.create(thread.getName());
+                startMonitor(durationMonitor);
                 profiler.startTick();
                 profiler.push("tick");
                 tick(this::shouldKeepTicking);
@@ -96,6 +110,7 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
                 runServerTasks();
                 profiler.pop();
                 profiler.endTick();
+                endMonitor(durationMonitor);
             }
         } catch (Throwable t) {
             logger.error("Encountered an unexpected exception", t);
@@ -115,9 +130,14 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
         runTasks(() -> !shouldKeepTicking());
     }
 
+    protected int getTicks() {
+        return ticks;
+    }
+
     protected void tick(BooleanSupplier shouldKeepTicking) {
+        long l = Util.getMeasuringTimeNano();
         ticks++;
-        profiler.push(thread.getName());
+        profiler.push(worldName);
         if ((ticks & 255) == 0) {
             profiler.push("timeSync");
             server.getPlayerManager().sendToDimension(new WorldTimeUpdateS2CPacket(world.getTime(), world.getTimeOfDay(), world.getGameRules().getBoolean(GameRules.DO_DAYLIGHT_CYCLE)), world.getRegistryKey());
@@ -131,8 +151,54 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
             world.addDetailsToCrashReport(report);
             throw new CrashException(report);
         }
+        profiler.swap("connection");
+        tickConnections();
         profiler.pop();
+        long n = Util.getMeasuringTimeNano();
+        metricsData.pushSample(n - l);
         profiler.pop();
+    }
+
+    protected void tickConnections() {
+        if (!awaitingConnections.isEmpty()) {
+            ClientConnection connection;
+            while ((connection = awaitingConnections.poll()) != null) {
+                if (activeConnections.contains(connection)) {
+                    logger.warn("Duplicate connection {} enqueued.", connection);
+                } else activeConnections.add(connection);
+            }
+        }
+        var iterator = activeConnections.iterator();
+        while (iterator.hasNext()) {
+            var clientConnection = iterator.next();
+            if (clientConnection.hasChannel()) continue;
+            var iConnection = (IClientConnection) clientConnection;
+            var subServer = iConnection.getOwner();
+            if (subServer != this) {
+                logger.warn("Connection {} @ {} is active in {}?! Enqueuing into correct SubServer.",
+                        clientConnection, subServer, this);
+                subServer.queueConnection(clientConnection);
+                iterator.remove();
+                continue;
+            }
+
+            if (clientConnection.isOpen()) {
+                try {
+                    clientConnection.tick();
+                } catch (Exception var7) {
+                    if (clientConnection.isLocal())
+                        throw new CrashException(CrashReport.create(var7, "Ticking memory connection"));
+
+                    logger.warn("Failed to handle packet for {}", clientConnection.getAddress(), var7);
+                    Text text = new LiteralText("Internal server error");
+                    clientConnection.send(new DisconnectS2CPacket(text), (future) -> clientConnection.disconnect(text));
+                    clientConnection.disableAutoRead();
+                }
+            } else {
+                iterator.remove();
+                clientConnection.handleDisconnection();
+            }
+        }
     }
 
     protected void executeTask(ServerTask serverTask) {
@@ -140,17 +206,32 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
         super.executeTask(serverTask);
     }
 
-    public boolean runTask() {
-        boolean bl = this.method_20415();
-        this.waitingForNextTick = bl;
-        return bl;
+    private void startMonitor(TickDurationMonitor monitor) {
+        /*if(profilerStartQueued) {
+            profileStartQueued = false;
+            tickTimeTracker.enable();
+        }*/
+        profiler = TickDurationMonitor.tickProfiler(tickTimeTracker.getProfiler(), monitor);
     }
 
-    private boolean method_20415() {
-        return super.runTask() || (shouldKeepTicking() && world.getChunkManager().executeQueuedTasks());
+    private void endMonitor(TickDurationMonitor monitor) {
+        if (monitor != null) monitor.endTick();
+        profiler = tickTimeTracker.getProfiler();
+    }
+
+    public void queueConnection(ClientConnection connection) {
+        awaitingConnections.offer(connection);
+    }
+
+    public boolean runTask() {
+        return waitingForNextTick = super.runTask() || (shouldKeepTicking() && world.getChunkManager().executeQueuedTasks());
     }
 
     private boolean shouldKeepTicking() {
         return hasRunningTasks() || Util.getMeasuringTimeMs() < (waitingForNextTick ? maxTimeReference : timeReference);
+    }
+
+    public String toString() {
+        return "SubServer " + worldName;
     }
 }

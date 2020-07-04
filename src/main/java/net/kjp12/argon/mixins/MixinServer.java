@@ -2,6 +2,7 @@ package net.kjp12.argon.mixins;
 
 import net.kjp12.argon.concurrent.ArgonCompletable;
 import net.kjp12.argon.concurrent.ArgonTask;
+import net.kjp12.argon.helpers.IMinecraftServer;
 import net.kjp12.argon.helpers.SubServer;
 import net.minecraft.SharedConstants;
 import net.minecraft.command.DataCommandStorage;
@@ -42,10 +43,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.BooleanSupplier;
@@ -53,7 +51,7 @@ import java.util.function.BooleanSupplier;
 import static net.kjp12.argon.Argon.logger;
 
 @Mixin(MinecraftServer.class)
-public abstract class MixinServer extends ReentrantThreadExecutor<ServerTask> implements SnooperListener, CommandOutput, AutoCloseable, Runnable {
+public abstract class MixinServer extends ReentrantThreadExecutor<ServerTask> implements SnooperListener, CommandOutput, AutoCloseable, IMinecraftServer, Runnable {
     protected final Map<RegistryKey<World>, SubServer> worldThreads = new ConcurrentHashMap<>();
     @Shadow
     @Final
@@ -114,6 +112,12 @@ public abstract class MixinServer extends ReentrantThreadExecutor<ServerTask> im
 
     @Shadow
     protected abstract void updateMobSpawnOptions();
+
+    @Shadow
+    private volatile boolean running;
+
+    @Shadow
+    private long lastTimeReference;
 
     public MixinServer(String string) {
         super(string);
@@ -297,5 +301,39 @@ public abstract class MixinServer extends ReentrantThreadExecutor<ServerTask> im
     @Redirect(method = "method_20415()Z", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;shouldKeepTicking()Z"))
     private boolean argon$shouldKeepTicking$no(MinecraftServer self) {
         return false;
+    }
+
+    @Inject(method = "shutdown()V", at = @At(value = "HEAD"))
+    private void argon$shutdown$ensureThreadsStop(CallbackInfo cbi) {
+        running = false;
+        for (var sub : worldThreads.values()) {
+            var t = sub.getThread();
+            for (int i = 0; i < 60 && t.isAlive(); i++)
+                try {
+                    t.interrupt();
+                    t.join(50L);
+                } catch (InterruptedException ignore) {
+                }
+            if (t.isAlive()) {
+                logger.warn("World {}/{} refused to stop after 3 seconds, forcefully stopping thread.", t, sub.getWorld());
+                t.stop();
+            }
+        }
+    }
+
+    public long getLastTimeReference() {
+        return lastTimeReference;
+    }
+
+    public long getTimeReference() {
+        return timeReference;
+    }
+
+    public SubServer getSubServer(RegistryKey<World> key) {
+        return worldThreads.get(key);
+    }
+
+    public Collection<SubServer> getSubServers() {
+        return worldThreads.values();
     }
 }

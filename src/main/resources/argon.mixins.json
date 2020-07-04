@@ -3,13 +3,18 @@
   "package": "net.kjp12.argon.mixins",
   "compatibilityLevel": "JAVA_11",
   "mixins": [
-    "AccessorServer",
     "MixinNetworkThreadUtils",
+    "MixinPlayerEntity",
     "MixinPlayerManager",
     "MixinServer",
     "MixinServerPlayNetworkHandler",
     "MixinTickable",
+    "network.MixinClientConnection",
+    "network.MixinServerIo",
     "world.MixinWorld"
+  ],
+  "client": [
+    "client.ArgonDebugHud"
   ],
   "injectors": {
     "defaultRequire": 1
