@@ -4,6 +4,7 @@ import net.kjp12.argon.concurrent.ArgonCompletable;
 import net.kjp12.argon.concurrent.ArgonTask;
 import net.kjp12.argon.helpers.IMinecraftServer;
 import net.kjp12.argon.helpers.SubServer;
+import net.kjp12.argon.helpers.SubServerWorld;
 import net.minecraft.SharedConstants;
 import net.minecraft.command.DataCommandStorage;
 import net.minecraft.entity.boss.BossBarManager;
@@ -12,6 +13,7 @@ import net.minecraft.server.command.CommandOutput;
 import net.minecraft.server.function.CommandFunctionManager;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.test.TestManager;
+import net.minecraft.util.ProgressListener;
 import net.minecraft.util.Util;
 import net.minecraft.util.crash.CrashException;
 import net.minecraft.util.crash.CrashReport;
@@ -118,6 +120,9 @@ public abstract class MixinServer extends ReentrantThreadExecutor<ServerTask> im
 
     @Shadow
     private long lastTimeReference;
+
+    @Shadow
+    private boolean stopped;
 
     public MixinServer(String string) {
         super(string);
@@ -281,6 +286,15 @@ public abstract class MixinServer extends ReentrantThreadExecutor<ServerTask> im
         timeReference = Util.getMeasuringTimeMs() + 10L;
         method_16208();
         updateMobSpawnOptions();
+    }
+
+    @Redirect(method = "save(ZZZ)Z", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerWorld;save(Lnet/minecraft/util/ProgressListener;ZZ)V"))
+    private void argon$tick$concurrentSave(ServerWorld self, ProgressListener $0, boolean $1, boolean $2) {
+        if (running && !stopped) {
+            ((SubServerWorld) self).getSubServer().execute(() -> self.save($0, $1, $2));
+        } else {
+            self.save($0, $1, $2);
+        }
     }
 
     @Redirect(method = "tick(Ljava/util/function/BooleanSupplier;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickWorlds(Ljava/util/function/BooleanSupplier;)V"))

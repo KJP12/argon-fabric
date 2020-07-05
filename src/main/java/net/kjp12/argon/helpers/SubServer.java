@@ -177,7 +177,10 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
             if (subServer != this) {
                 logger.warn("Connection {} @ {} is active in {}?! Enqueuing into correct SubServer.",
                         clientConnection, subServer, this);
-                subServer.queueConnection(clientConnection);
+                if (subServer != null) {
+                    // This isn't owned by anyone, the main server will tick it.
+                    subServer.queueConnection(clientConnection);
+                }
                 iterator.remove();
                 continue;
             }

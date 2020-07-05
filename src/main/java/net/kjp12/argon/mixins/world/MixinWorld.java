@@ -1,6 +1,7 @@
 package net.kjp12.argon.mixins.world;
 
 import net.kjp12.argon.TickingState;
+import net.kjp12.argon.helpers.IClientConnection;
 import net.kjp12.argon.helpers.SubServer;
 import net.kjp12.argon.helpers.SubServerWorld;
 import net.kjp12.argon.utils.Ticker;
@@ -41,6 +42,9 @@ public abstract class MixinWorld extends World implements ServerWorldAccess, Sub
     @Shadow
     public abstract void removePlayer(ServerPlayerEntity player);
 
+    @Shadow
+    protected abstract void addPlayer(ServerPlayerEntity player);
+
     protected MixinWorld(MutableWorldProperties mutableWorldProperties, RegistryKey<World> registryKey, RegistryKey<DimensionType> registryKey2, DimensionType dimensionType, Supplier<Profiler> profiler, boolean bl, boolean bl2, long l) {
         super(mutableWorldProperties, registryKey, registryKey2, dimensionType, profiler, bl, bl2, l);
     }
@@ -59,6 +63,16 @@ public abstract class MixinWorld extends World implements ServerWorldAccess, Sub
     private void argon$removePlayer(ServerPlayerEntity player, CallbackInfo cbi) {
         if (Thread.currentThread() != subServer.getThread()) {
             subServer.execute(() -> removePlayer(player));
+            cbi.cancel();
+        }
+    }
+
+    @Inject(method = "addPlayer", at = @At("HEAD"), cancellable = true)
+    private void argon$addPlayer(ServerPlayerEntity player, CallbackInfo cbi) {
+        if (Thread.currentThread() != subServer.getThread()) {
+            // force subserver handoff
+            ((IClientConnection) player.networkHandler.connection).setOwner(subServer);
+            subServer.execute(() -> addPlayer(player));
             cbi.cancel();
         }
     }

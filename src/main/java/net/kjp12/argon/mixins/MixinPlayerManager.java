@@ -34,7 +34,7 @@ public class MixinPlayerManager {
                                                           GameProfile $0, UserCache $1, String $3, CompoundTag $4, RegistryKey<World> worldKey) {
         var subServer = ((IMinecraftServer) server).getSubServer(worldKey);
         ((IClientConnection) connection).setOwner(subServer);
-        subServer.queueConnection(connection);
+        // subServer.queueConnection(connection);
     }
 
     @Redirect(method = "onPlayerConnect(Lnet/minecraft/network/ClientConnection;Lnet/minecraft/server/network/ServerPlayerEntity;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/network/ServerPlayerEntity;onSpawn()V"))
