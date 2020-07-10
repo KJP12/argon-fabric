@@ -245,6 +245,8 @@ public abstract class MixinServer extends ReentrantThreadExecutor<ServerTask> im
 
     /**
      * Overhaul the prepareStartRegion method to be concurrent.
+     * Also, WorldGenerationProgressListener is useless in concurrent context, especially with
+     * Lithium present. It is not used on purpose.
      *
      * @reason Concurrency model doesn't fit inside the serial model of the overwritten method.
      * Injectors and Redirects would be hell for this, as there's no way to null route all methods properly.
@@ -252,27 +254,7 @@ public abstract class MixinServer extends ReentrantThreadExecutor<ServerTask> im
      * @author KJP12
      */
     @Overwrite
-    private void prepareStartRegion(WorldGenerationProgressListener progressListener) {
-        var overworld = worldThreads.get(World.OVERWORLD);
-        overworld.execute(() -> {
-            var world = overworld.getWorld();
-            logger.info("Preparing start region for dimension {} (or rather, skip them)", world.getDimensionRegistryKey().getValue());
-            var pos = world.getSpawnPos();
-            var cpos = new ChunkPos(pos);
-            progressListener.start(cpos);
-            /*var chunkManager = world.getChunkManager();
-            chunkManager.getLightingProvider().setTaskBatchSize(500);
-            timeReference = Util.getMeasuringTimeMs();
-            chunkManager.addTicket(ChunkTicketType.START, cpos, 11, Unit.INSTANCE);
-            while(chunkManager.getTotalChunksLoadedCount() < 441) {
-                timeReference = Util.getMeasuringTimeMs() + 10L;
-                overworld.runServerTasks();
-            }
-            timeReference = Util.getMeasuringTimeMs() + 10L;
-            overworld.runServerTasks();
-            chunkManager.getLightingProvider().setTaskBatchSize(5);*/
-            progressListener.stop();
-        });
+    private void prepareStartRegion(WorldGenerationProgressListener ignored) {
         for (var world : worldThreads.values()) {
             world.execute(() -> {
                 var w = world.getWorld();

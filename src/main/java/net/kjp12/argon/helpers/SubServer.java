@@ -130,8 +130,16 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
         runTasks(() -> !shouldKeepTicking());
     }
 
-    protected int getTicks() {
+    public int getTicks() {
         return ticks;
+    }
+
+    public long getTimeReference() {
+        return timeReference;
+    }
+
+    public long getLastTimeReference() {
+        return lastTimeReference;
     }
 
     protected void tick(BooleanSupplier shouldKeepTicking) {

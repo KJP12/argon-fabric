@@ -7,7 +7,10 @@ import net.kjp12.argon.helpers.SubServer;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.Packet;
 import net.minecraft.network.listener.PacketListener;
+import net.minecraft.server.network.ServerLoginNetworkHandler;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,11 +37,11 @@ public abstract class MixinClientConnection extends SimpleChannelInboundHandler<
 
     private AtomicReference<SubServer> world = new AtomicReference<>();
 
-    /*/**
+    /**
      * @reason Overwritten method is evil. (Concurrency with a slight change.)
      * @author KJP12
      * */
-    /*@Overwrite
+    @Overwrite
     public void tick() {
         sendQueuedPackets();
 
@@ -61,7 +64,7 @@ public abstract class MixinClientConnection extends SimpleChannelInboundHandler<
             packetsReceivedCounter = 0;
         }
 
-    }*/
+    }
 
     @Override
     public boolean isOwnedByWorld() {

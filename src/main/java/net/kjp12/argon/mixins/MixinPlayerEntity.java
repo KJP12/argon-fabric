@@ -20,6 +20,7 @@ import net.minecraft.world.biome.source.BiomeAccess;
 import net.minecraft.world.dimension.DimensionType;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
 
 import javax.annotation.Nullable;
@@ -73,8 +74,8 @@ public abstract class MixinPlayerEntity extends PlayerEntity {
      * @author KJP12
      */
     @Nullable
-//    @Overwrite
-    public Entity $$changeDimension(ServerWorld newWorld) {
+    @Overwrite
+    public Entity changeDimension(ServerWorld newWorld) {
         var oldWorld = getServerWorld();
         if (oldWorld == newWorld)
             // There's literally no need to execute this code.
@@ -154,6 +155,8 @@ public abstract class MixinPlayerEntity extends PlayerEntity {
                     });
                 }
                 setWorld(newWorld);
+                // This is required as the remove variable doesn't get properly reset with jumping threads.
+                removed = false;
                 newWorld.onPlayerChangeDimension(self);
                 dimensionChanged(newWorld);
                 networkHandler.requestTeleport(getX(), getY(), getZ(), yaw, pitch);
