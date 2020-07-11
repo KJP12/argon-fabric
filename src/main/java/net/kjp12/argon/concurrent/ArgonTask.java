@@ -1,5 +1,6 @@
 package net.kjp12.argon.concurrent;
 
+import javax.annotation.Nonnull;
 import java.util.concurrent.*;
 
 public class ArgonTask<T> extends ArgonCompletable<T> implements Runnable {
@@ -92,7 +93,7 @@ public class ArgonTask<T> extends ArgonCompletable<T> implements Runnable {
     }
 
     @Override
-    public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+    public T get(long timeout, @Nonnull TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
         if (isDone()) return getRaw();
         if (isCancelled()) throw new CancellationException();
         synchronized (task) { //TODO: Better lock?

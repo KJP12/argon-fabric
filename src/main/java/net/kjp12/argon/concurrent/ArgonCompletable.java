@@ -1,5 +1,6 @@
 package net.kjp12.argon.concurrent;
 
+import javax.annotation.Nonnull;
 import java.util.Objects;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -7,7 +8,7 @@ import java.util.function.Consumer;
 
 public class ArgonCompletable<T> implements ArgonFuture<T> {
     protected Executor asyncPool;
-    protected volatile ConcurrentLinkedQueue<ArgonConsumer<T>> queue = new ConcurrentLinkedQueue<>();
+    protected volatile ConcurrentLinkedQueue<ArgonConsumer<T>> queue;
     protected AtomicReference<T> object = new AtomicReference<>();
     protected volatile Throwable thrown;
 
@@ -17,6 +18,17 @@ public class ArgonCompletable<T> implements ArgonFuture<T> {
 
     public ArgonCompletable(Executor asyncPool) {
         this.asyncPool = asyncPool;
+        queue = new ConcurrentLinkedQueue<>();
+    }
+
+    public ArgonCompletable(Executor asyncPool, T t) {
+        this.asyncPool = asyncPool;
+        object.set(t);
+    }
+
+    public ArgonCompletable(Executor asyncPool, Throwable thrown) {
+        this.asyncPool = asyncPool;
+        this.thrown = thrown;
     }
 
     public void complete(T object) {
@@ -107,7 +119,7 @@ public class ArgonCompletable<T> implements ArgonFuture<T> {
     }
 
     @Override
-    public T get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+    public T get(long timeout, @Nonnull TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
         if (isDone()) return getRaw();
         if (isCancelled()) throw new CancellationException();
         synchronized (this) { // TODO: Better lock?

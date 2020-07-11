@@ -140,26 +140,27 @@ public abstract class MixinPlayerEntity extends PlayerEntity {
             cameraPosition = ChunkSectionPos.from(MathHelper.floor(x) >> 4, MathHelper.floor(y) >> 4, MathHelper.floor(z) >> 4);
             var subServer = ((SubServerWorld) newWorld).getSubServer();
             ((IClientConnection) networkHandler.connection).setOwner(subServer);
+            double dx = x, dy = y, dz = z;
             subServer.execute(() -> {
                 if (newWorldKey == World.END) {
                     ServerWorld.createEndSpawnPlatform(newWorld);
-                    refreshPositionAndAngles(Math.floor(getX()), Math.floor(getY()), Math.floor(getZ()), 90F, 0F);
+                    // For some reason, having refresh pos after teleport works while just refresh position and angles alone doesn't. Why?
+                    refreshPositionAfterTeleport(dx, dy, dz);
+                    refreshPositionAndAngles(dx, dy, dz, 90F, 0F);
                     setVelocity(Vec3d.ZERO);
                 } else {
-                    subServer.execute(() -> {
-                        var portalForcer = newWorld.getPortalForcer();
-                        if (!portalForcer.usePortal(this, yaw)) {
-                            portalForcer.createPortal(this);
-                            portalForcer.usePortal(this, yaw);
-                        }
-                    });
+                    var portalForcer = newWorld.getPortalForcer();
+                    if (!portalForcer.usePortal(this, yaw)) {
+                        portalForcer.createPortal(this);
+                        portalForcer.usePortal(this, yaw);
+                    }
                 }
-                setWorld(newWorld);
+                networkHandler.requestTeleport(getX(), getY(), getZ(), yaw, pitch);
                 // This is required as the remove variable doesn't get properly reset with jumping threads.
                 removed = false;
+                setWorld(newWorld);
                 newWorld.onPlayerChangeDimension(self);
                 dimensionChanged(newWorld);
-                networkHandler.requestTeleport(getX(), getY(), getZ(), yaw, pitch);
                 interactionManager.setWorld(newWorld);
                 networkHandler.sendPacket(new PlayerAbilitiesS2CPacket(abilities));
                 playerManager.sendWorldInfo(self, newWorld);

@@ -24,7 +24,9 @@ public class MixinServerPlayNetworkHandler {
 
     @Inject(method = "tick()V", at = @At(value = "HEAD"))
     private void argon$tick$playerTick(CallbackInfo cbi) {
-        if (!((IClientConnection) connection).getOwner().isOnThread())
+        var owner = ((IClientConnection) connection).getOwner();
+        // It is possible for the owner to be null when the end disowns the player.
+        if (owner != null && !owner.isOnThread())
             logger.warn("Player {} is owned by {}", player, ((IClientConnection) connection).getOwner().getThread());
     }
 }
