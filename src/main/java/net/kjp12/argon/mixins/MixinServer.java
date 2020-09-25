@@ -44,7 +44,6 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
@@ -270,6 +269,10 @@ public abstract class MixinServer extends ReentrantThreadExecutor<ServerTask> im
         updateMobSpawnOptions();
     }
 
+    /**
+     * @reason Because saving blocks all threads, it would be better to tell the subserver to save via their executors.
+     * @author KJP12
+     * */
     @Redirect(method = "save(ZZZ)Z", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/world/ServerWorld;save(Lnet/minecraft/util/ProgressListener;ZZ)V"))
     private void argon$tick$concurrentSave(ServerWorld self, ProgressListener $0, boolean $1, boolean $2) {
         if (running && !stopped) {

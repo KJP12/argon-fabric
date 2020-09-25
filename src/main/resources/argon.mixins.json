@@ -4,7 +4,9 @@
   "compatibilityLevel": "JAVA_11",
   "mixins": [
     "MixinNetworkThreadUtils",
-    "MixinPlayerEntity",
+    "entities.AccessorMobEntity",
+    "entities.MixinEntity",
+    "entities.MixinPlayerEntity",
     "MixinPlayerManager",
     "MixinServer",
     "MixinServerPlayNetworkHandler",
@@ -15,7 +17,10 @@
     "world.MixinWorld"
   ],
   "client": [
-    "client.ArgonDebugHud"
+    "client.AccessorClient",
+    "client.ArgonDebugHud",
+    "client.ArgonKeyboard",
+    "client.MixinProfilerSystem"
   ],
   "injectors": {
     "defaultRequire": 1

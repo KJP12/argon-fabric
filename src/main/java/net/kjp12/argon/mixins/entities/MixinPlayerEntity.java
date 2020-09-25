@@ -1,4 +1,4 @@
-package net.kjp12.argon.mixins;
+package net.kjp12.argon.mixins.entities;
 
 import com.mojang.authlib.GameProfile;
 import net.kjp12.argon.helpers.IClientConnection;
@@ -22,7 +22,6 @@ import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.Shadow;
-
 import javax.annotation.Nullable;
 
 @Mixin(ServerPlayerEntity.class)
@@ -67,7 +66,6 @@ public abstract class MixinPlayerEntity extends PlayerEntity {
 
     @Shadow
     protected abstract void dimensionChanged(ServerWorld targetWorld);
-// TODO: Fix this up, the code breaks under all conditions./
 
     /**
      * @reason This is not able to be concurrently run due to locking methods from Portal Forcer and such.
@@ -92,6 +90,7 @@ public abstract class MixinPlayerEntity extends PlayerEntity {
                 networkHandler.sendPacket(new GameStateChangeS2CPacket(GameStateChangeS2CPacket.GAME_WON, seenCredits ? 0 : 1));
                 seenCredits = true;
             }
+            inNetherPortal = false;
             // The end doesn't own this player any more.
             // The player is not in the overworld either, so it isn't the owner.
             // The primary server thread will tick the connection instead.

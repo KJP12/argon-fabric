@@ -3,17 +3,17 @@ package net.kjp12.argon.mixins.client;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.kjp12.argon.helpers.IMinecraftServer;
-import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.math.AffineTransformation;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.client.util.math.Vector3f;
 import net.minecraft.util.MetricsData;
-import net.minecraft.util.Util;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Matrix4f;
 import net.minecraft.util.math.Quaternion;
+import net.minecraft.util.profiler.EmptyProfileResult;
+import net.minecraft.util.profiler.ProfileResult;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -21,7 +21,13 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
+
 import static com.mojang.blaze3d.systems.RenderSystem.*;
+import static net.kjp12.argon.Argon.*;
+import static net.minecraft.client.MinecraftClient.IS_SYSTEM_MAC;
 import static net.minecraft.client.gui.DrawableHelper.fill;
 
 @Mixin(GameRenderer.class)
@@ -60,27 +66,34 @@ public class ArgonDebugHud {
         var server = client.getServer();
         if (server != null) {
             int i = 0;
-            var aBlock = Blocks.DIRT.getDefaultState();
-            var grassModel = client.getBlockRenderManager().getModel(aBlock);
-            for (var sub : ((IMinecraftServer) server).getSubServers()) {
-                argon$drawMetricsData(buffer, matrix4f, stack, sub.metricsData, sw - 240, sh - (i++ * 60), 20, sub.toString(), "TPS");
-                long ntr = Util.getMeasuringTimeMs(), ltr = sub.getLastTimeReference(), tr = sub.getTimeReference();
-                pushMatrix();
-                translatef(sw - 252F, sh - (i - 1 * 60F) + 2F, 1050F);
-                scalef(1F, 1F, -1F);
-                stack.push();
-                stack.translate(sw - 12D, 10D + (i * 10D), 1000D);
-                stack.scale(10F, 10F, 10F);
-                int ttr = (int) (tr - ntr);
-                var q = Vector3f.POSITIVE_Y.getDegreesQuaternion(/*(MathHelper.lerpAngleDegrees(Math.max(0, ttr) / 50F, .15F * ltr, .5F * tr))*/ b++ % 360F);
-                q.hamiltonProduct(QY75);
-                stack.multiply(q);
-                var immediate = VertexConsumerProvider.immediate(buffer);
-                var buf = immediate.getBuffer(RenderLayers.method_29359(aBlock));
-                client.getBlockRenderManager().getModelRenderer().render(stack.peek(), ttr < 0 ? buf.color(255, 0, 0, 255) : buffer, aBlock, grassModel, 0, 0, 0, 15728880, OverlayTexture.DEFAULT_UV);
-                immediate.draw();
-                stack.pop();
-                popMatrix();
+            //var aBlock = Blocks.DIRT.getDefaultState();
+            // var grassModel = client.getBlockRenderManager().getModel(aBlock);
+            if (serverToProfile != null) {
+                argon$drawMetricsData(buffer, matrix4f, stack, serverToProfile.metricsData, sw - 240, sh, 20, serverToProfile.toString(), "TPS");
+                if(profileResult != null) argon$drawProfilerResults(stack, profileResult);
+            } else {
+                for (var sub : ((IMinecraftServer) server).getSubServers()) {
+                    argon$drawMetricsData(buffer, matrix4f, stack, sub.metricsData, sw - 240, sh - (i++ * 60), 20, sub.toString(), "TPS");
+                    /*
+                    long ntr = Util.getMeasuringTimeMs(), ltr = sub.getLastTimeReference(), tr = sub.getTimeReference();
+                    pushMatrix();
+                    translatef(sw - 252F, sh - (i - 1 * 60F) + 2F, 1050F);
+                    scalef(1F, 1F, -1F);
+                    stack.push();
+                    stack.translate(sw - 12D, 10D + (i * 10D), 1000D);
+                    stack.scale(10F, 10F, 10F);
+                    int ttr = (int) (tr - ntr);
+                    var q = Vector3f.POSITIVE_Y.getDegreesQuaternion(/*(MathHelper.lerpAngleDegrees(Math.max(0, ttr) / 50F, .15F * ltr, .5F * tr))*//* b++ % 360F);
+                    q.hamiltonProduct(QY75);
+                    stack.multiply(q);
+                    var immediate = VertexConsumerProvider.immediate(buffer);
+                    var buf = immediate.getBuffer(RenderLayers.method_29359(aBlock));
+                    client.getBlockRenderManager().getModelRenderer().render(stack.peek(), ttr < 0 ? buf.color(255, 0, 0, 255) : buffer, aBlock, grassModel, 0, 0, 0, 15728880, OverlayTexture.DEFAULT_UV);
+                    immediate.draw();
+                    stack.pop();
+                    popMatrix();
+                    */
+                }
             }
         }
     }
@@ -141,5 +154,104 @@ public class ArgonDebugHud {
 
         client.textRenderer.draw(stack, to, x, y - 60, 0x7983FC);
         client.textRenderer.draw(stack, e, x, y - l + 2, 0x7983FC);
+    }
+
+    private void argon$drawProfilerResults(MatrixStack matrixStack, ProfileResult profileResult) {
+        if(profileResult instanceof EmptyProfileResult) return;
+        var list = profileResult.getTimings(profileSection);
+        var profilerTiming = list.remove(0);
+        int fbw = client.getWindow().getFramebufferWidth(), fbh = client.getWindow().getFramebufferHeight();
+        clear(256, IS_SYSTEM_MAC);
+        matrixMode(5889);
+        loadIdentity();
+        ortho(0.0D, fbw, fbh, 0.0D, 1000.0D, 3000.0D);
+        matrixMode(5888);
+        loadIdentity();
+        translatef(0.0F, 0.0F, -2000.0F);
+        lineWidth(1.0F);
+        disableTexture();
+        var tessellator = Tessellator.getInstance();
+        var buffer = tessellator.getBuffer();
+        int j = fbw - 170, k = fbh - 320;
+        enableBlend();
+        buffer.begin(7, VertexFormats.POSITION_COLOR);
+        buffer.vertex(j - 176, k - 96F - 16F, 0.0D).color(200, 0, 0, 0).next();
+        buffer.vertex(j - 176, k + 320, 0.0D).color(200, 0, 0, 0).next();
+        buffer.vertex(j + 176, k + 320, 0.0D).color(200, 0, 0, 0).next();
+        buffer.vertex(j + 176, k - 96F - 16F, 0.0D).color(200, 0, 0, 0).next();
+        tessellator.draw();
+        disableBlend();
+        double d = 0.0D;
+
+        int v;
+        for (var profilerTiming2 : list) {
+            int l = MathHelper.floor(profilerTiming2.parentSectionUsagePercentage / 4.0D) + 1;
+            buffer.begin(6, VertexFormats.POSITION_COLOR);
+            v = profilerTiming2.getColor();
+            int n = v >> 16 & 255,  o = v >> 8 & 255,  p = v & 255;
+            buffer.vertex(j, k, 0.0D).color(n, o, p, 255).next();
+
+            int r;
+            float s, t, u;
+            for (r = l; r >= 0; --r) {
+                s = (float) ((d + profilerTiming2.parentSectionUsagePercentage * (double) r / (double) l) * Math.PI * 2D / 100.0D);
+                t = MathHelper.sin(s) * 160.0F;
+                u = MathHelper.cos(s) * 160.0F * 0.5F;
+                buffer.vertex(j + t, k - u, 0.0D).color(n, o, p, 255).next();
+            }
+
+            tessellator.draw();
+            buffer.begin(5, VertexFormats.POSITION_COLOR);
+
+            for (r = l; r >= 0; --r) {
+                s = (float) ((d + profilerTiming2.parentSectionUsagePercentage * (double) r / (double) l) * Math.PI * 2D / 100.0D);
+                t = MathHelper.sin(s) * 160.0F;
+                u = MathHelper.cos(s) * 160.0F * 0.5F;
+                if (u <= 0.0F) {
+                    buffer.vertex(j + t, k - u, 0.0D).color(n >> 1, o >> 1, p >> 1, 255).next();
+                    buffer.vertex(j + t, k - u + 10.0F, 0.0D).color(n >> 1, o >> 1, p >> 1, 255).next();
+                }
+            }
+
+            tessellator.draw();
+            d += profilerTiming2.parentSectionUsagePercentage;
+        }
+
+        DecimalFormat decimalFormat = new DecimalFormat("##0.00");
+        decimalFormat.setDecimalFormatSymbols(DecimalFormatSymbols.getInstance(Locale.ROOT));
+        enableTexture();
+        String string = ProfileResult.getHumanReadableName(profilerTiming.name);
+        String string2 = "";
+        if (!"unspecified".equals(string)) {
+            string2 = string2 + "[0] ";
+        }
+
+        if (string.isEmpty()) {
+            string2 = string2 + "ROOT ";
+        } else {
+            string2 = string2 + string + ' ';
+        }
+
+        client.textRenderer.drawWithShadow(matrixStack, string2, (float)(j - 160), (float)(k - 80 - 16), 16777215);
+        string2 = decimalFormat.format(profilerTiming.totalUsagePercentage) + "%";
+        client.textRenderer.drawWithShadow(matrixStack, string2, (float)(j + 160 - client.textRenderer.getWidth(string2)), (float)(k - 80 - 16), 16777215);
+
+        for(int w = 0; w < list.size(); ++w) {
+            var profilerTiming3 = list.get(w);
+            var stringBuilder = new StringBuilder();
+            if ("unspecified".equals(profilerTiming3.name)) {
+                stringBuilder.append("[?] ");
+            } else {
+                stringBuilder.append("[").append(w + 1).append("] ");
+            }
+
+            String string3 = stringBuilder.append(profilerTiming3.name).toString();
+            client.textRenderer.drawWithShadow(matrixStack, string3, (float)(j - 160), (float)(k + 80 + w * 8 + 20), profilerTiming3.getColor());
+            string3 = decimalFormat.format(profilerTiming3.parentSectionUsagePercentage) + "%";
+            client.textRenderer.drawWithShadow(matrixStack, string3, (float)(j + 160 - 50 - client.textRenderer.getWidth(string3)), (float)(k + 80 + w * 8 + 20), profilerTiming3.getColor());
+            string3 = decimalFormat.format(profilerTiming3.totalUsagePercentage) + "%";
+            client.textRenderer.drawWithShadow(matrixStack, string3, (float)(j + 160 - client.textRenderer.getWidth(string3)), (float)(k + 80 + w * 8 + 20), profilerTiming3.getColor());
+        }
+
     }
 }

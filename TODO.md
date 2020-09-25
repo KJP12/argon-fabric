@@ -1,0 +1,16 @@
+- [ ] Fabric API Support
+  - [ ] Dimensions
+- [ ] Proper commands support
+  - [ ] CLI (doesn't work currently, is null routed)
+  - [ ] /fill (intermittent due to concurrent chunk access, works fine off tick, breaks on tick)
+  - [ ] Datapacks don't properly work with function loops (Concurrent-based NPE)
+    - Perhaps join against the overworld to ensure it's always loaded in?
+- [ ] Safe concurrent world transfer for entities
+  - [ ] Apply checks for bad threaded access
+  - [ ] Make players queue automatically rather than relying on subserver to transfer on its own (adds up to two ticks wasted)
+  - [ ] Account for Brigadier's Flex (/execute in dimension run tp ~ ~ ~)
+  - [ ] Account for player death. (Special case of death, not in world.)
+- [ ] Actually Lazy Ticking (will still be sync due to nature of ticking)
+  - [ ] Active (ie. walking)
+  - [ ] Idle (every 8 ticks, same as hoppers, allows for use of `& 7`, which can be more efficient than `% 8`)
+  - [ ] Frozen (ie. chests, no AI)

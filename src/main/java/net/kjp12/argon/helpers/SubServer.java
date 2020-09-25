@@ -1,6 +1,10 @@
 package net.kjp12.argon.helpers;
 
+import net.fabricmc.api.EnvType;
+import net.fabricmc.loader.api.FabricLoader;
+import net.kjp12.argon.Argon;
 import net.kjp12.argon.concurrent.ArgonTask;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.network.ClientConnection;
 import net.minecraft.network.packet.s2c.play.DisconnectS2CPacket;
 import net.minecraft.network.packet.s2c.play.WorldTimeUpdateS2CPacket;
@@ -21,7 +25,6 @@ import net.minecraft.util.registry.RegistryKey;
 import net.minecraft.util.thread.ReentrantThreadExecutor;
 import net.minecraft.world.GameRules;
 import net.minecraft.world.World;
-
 import java.nio.file.Path;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -48,6 +51,7 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
     private long timeReference, lastTimeReference, maxTimeReference;
     private String worldName;
     private boolean waitingForNextTick;
+    private volatile boolean profilerStartQueued, profilerEndQueued;
 
     public SubServer(MinecraftServer server, RegistryKey<World> worldKey, ArgonTask<ServerWorld> worldTask) {
         super(worldKey.getValue().toString());
@@ -218,15 +222,22 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
     }
 
     private void startMonitor(TickDurationMonitor monitor) {
-        /*if(profilerStartQueued) {
-            profileStartQueued = false;
+        if(profilerStartQueued) {
+            profilerStartQueued = false;
             tickTimeTracker.enable();
-        }*/
+        }
         profiler = TickDurationMonitor.tickProfiler(tickTimeTracker.getProfiler(), monitor);
     }
 
     private void endMonitor(TickDurationMonitor monitor) {
         if (monitor != null) monitor.endTick();
+        if (profilerEndQueued) {
+            profilerEndQueued = false;
+            tickTimeTracker.disable();
+        }
+        if(Argon.serverToProfile == this) {
+            Argon.profileResult = tickTimeTracker.getResult();
+        }
         profiler = tickTimeTracker.getProfiler();
     }
 
@@ -236,6 +247,14 @@ public class SubServer extends ReentrantThreadExecutor<ServerTask> implements Ru
 
     public boolean runTask() {
         return waitingForNextTick = super.runTask() || (shouldKeepTicking() && world.getChunkManager().executeQueuedTasks());
+    }
+
+    public void enableProfiler(){
+        profilerStartQueued = true;
+    }
+
+    public void disableProfiler(){
+        profilerEndQueued = true;
     }
 
     private boolean shouldKeepTicking() {
